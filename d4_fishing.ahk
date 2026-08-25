@@ -1,144 +1,321 @@
-# Diablo IV Fishing Buddy
+; ==============================================================================
+; Diablo IV Fishing Buddy
+;
+; Copyright (c) 2026 SuperMilkers
+; SPDX-License-Identifier: MIT
+;
+; Licensed under the MIT License.
+; See the accompanying LICENSE file for the complete license text.
+;
+; This is an unofficial community project and is not affiliated with or
+; endorsed by Blizzard Entertainment.
+; ==============================================================================
 
-An AutoHotkey v1 script that uses GraphicSearch to automate Diablo IV fishing. It selects Fishing from a saved Action Wheel position, detects the fishing and bite indicators, and presses a configurable reel key.
+#Requires AutoHotkey v1.1
+#SingleInstance Force
+#Include %A_ScriptDir%\engine\export.ahk
 
-Copyright (c) 2026 SuperMilkers. Released under the MIT License.
+SetBatchLines, -1
+SetKeyDelay, 50, 50
 
-## Download
+; Icon shown when a fish can be reeled in.
+biteQuery := "|<>##101010$0/0/42D8C3,1/3/6DFDD6,-1/2/41DEC6,-2/1/3DC8B6"
 
-[Download Diablo IV Fishing Buddy](https://github.com/SuperMilkers/d4-fishing-buddy_AHK/archive/refs/heads/main.zip)
+; Icon confirming that fishing is active.
+fishingQuery := "|<>*96$72.U00000U00000E00000U0000F800000U000027zzzzzzzzzzwLzzzzzzzzzzx7zzzzzzyzzrx7zzzzzwEDxzxLzzzzzy087zxLzzzzzr00Tzx7zzzzwn01zzx7nzrrsDU7zzx7lzxzzDkzzzx7uSDzyDzzzzw7ks3TyzDbzzwLtkVfTzTzzzxLVXtVDyk7zzxLV3svDyk3rzx7X7wzS1U4Tzx7X6gnszy87zx7V6sn7U7y3zx6V3liy007lzx7VU1dk000szx7Uk3v0000CTx70kCS00003Tx70UwA00001jx70UkM0M000zx71UUks4000Tx71VUVw2000Dx711VVa20007x711X1y30003x7X130w34101x7X360037101x7W360033y01x76260036600w7663U07w200w6A61s0Cw200Qzw40TzwA3U0T7wA03zXg3s0Q7sA00MDgHC2Q7sA00s3gF62R7s801c6AFX2R7sM038AK9VWR7kM06+SHj0mR7kM0Q8ANy0mR7kI0s9DPU0qRLUo1U+3uk0wpLUo70P1qE0sxLUqD0N0CM0lhLUyDkHFiC1XxLUj0kr8N7z3RLUU1Uq0sEs6xLUy9UwVc80AQLUrn1jX600Qg7UQ631q1U0sQ7kDw30Q003sw7s7s60700DMw7s00A0Dw1wEw7w00M0Azzthw7z01k0Dzswxw7zU7U0DzzzTw7yzy00Dzzzzx7yDk00TzzzrxLwU000TzzzxxLs8000TzzzzxLk0E20Tzzzzx7y20T0zzzzzx7jDVz0zzzzzxL7zVTszzzzzxK00H00zzzzzx7zzzzzzzzzzwU"
 
-## Demonstration
+oGraphicSearch := new graphicsearch()
 
-![Diablo IV Fishing Buddy demonstration](assets/d4_fishing_buddy_AHK.gif)
+; Default reel key. Press F11 to change it.
+reelKey := "5"
 
-## Community
+setupMode := true
+ready := false
+paused := true
+changingReelKey := false
+fishingActive := false
+biteLatched := false
 
-Join the Discord for help, updates, and discussion: [discord.gg/gvgbacUHcN](https://discord.gg/gvgbacUHcN)
+castX := 0
+castY := 0
 
-## Requirements
+lastFishingSeen := 0
+lastBiteSeen := 0
+lastReel := 0
+lastCast := 0
 
-- Windows 10 or Windows 11
-- [AutoHotkey v1.1.37.02](https://www.autohotkey.com/download/1.1/AutoHotkey_1.1.37.02_setup.exe)
-- Diablo IV running in borderless-windowed mode
-- [GraphicSearch](https://github.com/Chunjee/graphicsearch.ahk) files included in the `engine` folder
+reelCooldown := 1500
+castCooldown := 5000
+noticeUntil := 0
+noticeText := ""
 
-AutoHotkey v2 is not compatible with this script. Versions 1 and 2 can be installed together because the script uses `#Requires AutoHotkey v1.1`.
+; Zoom configuration.
+zoomSteps := 4
+zoomStepsSent := 0
+zoomDelay := 500
 
-## Installation
+; Incremented whenever automation state changes.
+; This prevents an interrupted timer cycle from completing an old action.
+stateVersion := 0
 
-1. Install AutoHotkey v1.1.37.02.
-2. Download and extract this repository.
-3. Confirm that `engine\export.ahk` exists.
-4. Start Diablo IV and move to a fishing location.
-5. Double-click `d4_fishing.ahk`.
+ShowStatus("SETUP REQUIRED`nMove the cursor over the Fishing option's position in the Action Wheel.`nLeft-click once to save the position and immediately start fishing.`nAny left-click will complete setup.")
+return
 
-If Windows uses the wrong AutoHotkey version, run the script explicitly with v1:
+WatchFishing:
+    if (!ready || paused || setupMode || changingReelKey)
+        return
 
-```bat
-"C:\Program Files\AutoHotkey\v1.1.37.02\AutoHotkeyU64.exe" "C:\path\to\d4_fishing.ahk"
-```
+    cycleVersion := stateVersion
+    now := A_TickCount
 
-## Setup on Every Launch
+    fishingResult := oGraphicSearch.search(fishingQuery)
 
-The Fishing option position is stored only while the script is running:
+    if (paused || cycleVersion != stateVersion)
+        return
 
-1. Stand near fishable water and face it.
-2. Start `d4_fishing.ahk`.
-3. Press `E` to open the Diablo IV Action Wheel.
-4. Move the pointer over **Fishing** and left-click it.
-5. The script records the position and begins monitoring automatically.
+    if IsObject(fishingResult)
+    {
+        fishingActive := true
+        lastFishingSeen := now
 
-You do not need to press `F10` during startup. Use `F10` only to change the Fishing option position afterward.
+        biteResult := oGraphicSearch.search(biteQuery)
 
-After the first cast, the script scrolls up five times to zoom in for more reliable bite detection.
+        if (paused || cycleVersion != stateVersion)
+            return
 
-## Hotkeys
+        if IsObject(biteResult)
+        {
+            lastBiteSeen := now
 
-| Hotkey | Action |
-| --- | --- |
-| `F8` | Pause or resume automation |
-| `F10` | Choose a new Fishing option position |
-| `F11` | Change the reel key |
-| `Esc` | Quit |
+            if (!biteLatched && now - lastReel > reelCooldown)
+            {
+                if (paused || cycleVersion != stateVersion)
+                    return
 
-The default reel key is `5`. The selector accepts one keyboard key at a time. Do not assign `F8`, `F10`, `F11`, or `Esc` because the script reserves them.
+                biteLatched := true
+                lastReel := now
 
-## Gameplay Notes
+                reelSend := "{" reelKey "}"
+                SendEvent, %reelSend%
 
-- Fish on a low difficulty, such as Normal.
-- Face fishable water before starting.
-- Fish must be picked up manually.
-- Equip some Thorns in case nearby enemies attack or you fish up an enemy.
-- If **Diablo reconnecting** appears in the upper-left corner, wait for it to clear.
-- Keep the resolution, UI scale, and hotbar layout consistent.
+                SoundBeep, 1500, 200
+                noticeText := "FISH FOUND`nPRESSED " reelKey
+                noticeUntil := A_TickCount + 2000
+            }
+        }
+        else if (biteLatched && now - lastBiteSeen > 500)
+        {
+            biteLatched := false
+        }
 
-## Rare Fish Locations
+        defaultStatus := "FISHING ACTIVE`nWatching for a bite..."
+    }
+    else if (now - lastFishingSeen > 1200)
+    {
+        fishingActive := false
+        biteLatched := false
 
-These six yellow Rare fish are required for **The One That Got Away**. Each fish is tied to a region, so other fishable water in the same region may also work.
+        if (now - lastCast > castCooldown)
+        {
+            if (paused || cycleVersion != stateVersion)
+                return
 
-| Rare fish | Region | Suggested location |
-| --- | --- | --- |
-| Augur of Civo | Dry Steppes | Beach west of Ked Bardu |
-| Morayaga | Fractured Peaks | Bridge east of Yelesna |
-| Crookfish | Hawezar | Walkway east of Backwater |
-| Zakarati | Kehjistan | Docks southwest of Gea Kul |
-| Neme-Senga | Nahantu | Pier west of Kurast Docks |
-| Drakonbeard | Scosglen | Pier west of Marowen |
+            lastCast := now
 
-Catch the yellow **Rare** version and use it from your inventory to register it. Legendary and Unique versions do not count. After registering all six, return to Shi Yugong.
+            ; Open the Action Wheel.
+            SendEvent, {e}
+            Sleep, 400
 
-### Fractured Peaks
+            if (paused || cycleVersion != stateVersion)
+                return
 
-Travel southeast from Kyovashad to **Yelesna**, then fish from the bridge on the east side of town. **Marowen is in Scosglen**, not Fractured Peaks.
+            ; Select the saved Fishing option.
+            MouseMove, %castX%, %castY%, 0
+            Click
 
-## Trawghll Murloc Pet
+            if (paused || cycleVersion != stateVersion)
+                return
 
-**Trawghll** is a Murloc pet reportedly obtained from the Mythic **Gurgling Bag of Rubbish** while fishing.
+            ; Zoom in only after the first casting click.
+            if (zoomStepsSent < zoomSteps)
+            {
+                Sleep, %zoomDelay%
 
-- It can reportedly drop while fishing in any region.
-- There is no confirmed best location.
-- Completing the fish collection is not required.
-- The drop is extremely rare.
+                if (paused || cycleVersion != stateVersion)
+                    return
 
-## How It Works
+                Loop
+                {
+                    if (zoomStepsSent >= zoomSteps)
+                        break
 
-- Checks for the fishing-state icon every 100 milliseconds.
-- Watches for the bite icon while fishing is active.
-- Presses the configured reel key once when a bite is detected.
-- Presses `E` and clicks the saved Fishing position when it needs to cast again.
-- Uses cooldowns and detection latches to prevent repeated actions.
-- Displays the current state, reel key, and hotkeys in a tooltip.
+                    if (paused || cycleVersion != stateVersion)
+                        return
 
-## Troubleshooting
+                    SendEvent, {WheelUp}
+                    zoomStepsSent++
+                    Sleep, 60
+                }
+            }
 
-### Icons are not detected
+            noticeText := "CASTING`nPRESSED E + MOUSE CLICK`nZOOMED IN " zoomStepsSent " STEPS"
+            noticeUntil := A_TickCount + 2000
+        }
 
-- Use borderless-windowed mode.
-- The included searches were captured at `2560 × 1440`. Other resolutions or UI scales may require new captures.
-- Match the hotbar layout shown in the demonstration.
-- Disable HDR, overlays, and color filters.
-- Run the script as administrator if Diablo IV is also running as administrator.
-- Recapture the icons with `engine\graphicsearch_gui.ahk` if needed.
+        defaultStatus := "NOT CURRENTLY FISHING`nAttempting to cast..."
+    }
+    else
+    {
+        defaultStatus := "Checking fishing state..."
+    }
 
-### The casting click lands in the wrong place
+    if (paused || cycleVersion != stateVersion)
+        return
 
-Press `F10`, press `E` to open the Action Wheel, then click Fishing to save its new position. Repeat this after changing the resolution, UI scale, window, or monitor.
+    if (A_TickCount < noticeUntil)
+        ShowRunningStatus(noticeText, cycleVersion)
+    else
+        ShowRunningStatus(defaultStatus, cycleVersion)
+return
 
-### Keyboard actions do not reach the game
+; Capture the Fishing option's screen position during setup.
+#If (setupMode)
 
-Run Diablo IV and the script at the same privilege level. If the game runs as administrator, run the script as administrator.
+LButton::
+    MouseGetPos, castX, castY
 
-### Pause or quit
+    stateVersion++
+    setupMode := false
+    ready := true
+    paused := false
+    fishingActive := false
+    biteLatched := false
 
-Press `F8` and wait for **FISHING PAUSED** to appear. A short action already in progress may finish first. Press `Esc` to quit immediately.
+    ; Allow the first cast to happen immediately.
+    lastCast := A_TickCount - castCooldown
 
-## Disclaimer
+    SoundBeep, 1000, 150
+    ShowStatus("SETUP COMPLETE`nFishing option position: " castX ", " castY "`nFishing automation started.")
 
-This is an unofficial community project and is not affiliated with or endorsed by Blizzard Entertainment. Automation may be restricted by a game's terms or rules. You are responsible for deciding whether and where to use this script.
+    SetTimer, WatchFishing, 100
+return
 
-## License
+#If
 
-Diablo IV Fishing Buddy is licensed under the MIT License. See [LICENSE](LICENSE) for the complete text.
+; Pause or resume the automation.
+F8::
+    if (!ready)
+    {
+        ShowStatus("Complete the Fishing option position setup first.")
+        return
+    }
 
-GraphicSearch is a third-party dependency with its own license. Preserve its original copyright and license notices when redistributing its files.
+    stateVersion++
+    paused := !paused
+
+    if (paused)
+    {
+        SetTimer, WatchFishing, Off
+        ShowStatus("FISHING PAUSED")
+    }
+    else
+    {
+        ; Prevent an immediate recast when resuming.
+        lastCast := A_TickCount
+
+        SetTimer, WatchFishing, 100
+        ShowStatus("FISHING RESUMED")
+    }
+return
+
+; Choose a new Fishing option position.
+F10::
+    stateVersion++
+    SetTimer, WatchFishing, Off
+
+    paused := true
+    ready := false
+    setupMode := true
+    fishingActive := false
+    biteLatched := false
+
+    ShowStatus("SETUP REQUIRED`nMove the cursor over the new Fishing option position in the Action Wheel.`nLeft-click once to save the position and immediately resume fishing.`nAny left-click will complete setup.")
+return
+
+; Change the reel key.
+F11::
+    if (changingReelKey)
+        return
+
+    stateVersion++
+    changingReelKey := true
+    previousPauseState := paused
+    paused := true
+
+    SetTimer, WatchFishing, Off
+    ShowStatus("REEL KEY SETUP`nPress the new reel key now.")
+
+    keyCapture := InputHook("L0")
+    keyCapture.KeyOpt("{All}", "E")
+    keyCapture.Start()
+    keyCapture.Wait()
+
+    newReelKey := keyCapture.EndKey
+
+    if (newReelKey = "F8"
+        || newReelKey = "F10"
+        || newReelKey = "F11"
+        || newReelKey = "Escape")
+    {
+        ShowStatus("That key is reserved.`nReel key remains: " reelKey)
+    }
+    else if (newReelKey != "")
+    {
+        reelKey := newReelKey
+        SoundBeep, 1100, 150
+        ShowStatus("REEL KEY CHANGED TO: " reelKey)
+    }
+    else
+    {
+        ShowStatus("No key was captured.`nReel key remains: " reelKey)
+    }
+
+    changingReelKey := false
+    paused := previousPauseState
+
+    if (!paused && ready && !setupMode)
+        SetTimer, WatchFishing, 100
+return
+
+Esc::
+    SetTimer, WatchFishing, Off
+    ToolTip
+    ExitApp
+return
+
+; Display running status only if the current timer cycle is still valid.
+ShowRunningStatus(message, cycleVersion)
+{
+    global paused, stateVersion
+
+    Critical, On
+
+    if (!paused && cycleVersion = stateVersion)
+        ShowStatus(message)
+
+    Critical, Off
+}
+
+; Display the current status, reel key, and all controls.
+ShowStatus(message)
+{
+    global reelKey
+
+    controls := "`n`nReel key: " reelKey
+    controls .= "`nF8: Pause/Resume"
+    controls .= "`nF10: Change Fishing option position"
+    controls .= "`nF11: Change reel key"
+    controls .= "`nEsc: Quit"
+
+    ToolTip, % message controls, 20, 20
+}
