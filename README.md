@@ -4,10 +4,6 @@ An AutoHotkey v1 script that uses GraphicSearch to automate Diablo IV fishing. I
 
 Copyright (c) 2026 SuperMilkers. Released under the MIT License.
 
-## Download
-
-[Download Diablo IV Fishing Buddy](https://github.com/SuperMilkers/d4-fishing-buddy_AHK/archive/refs/heads/main.zip)
-
 ## Demonstration
 
 ![Diablo IV Fishing Buddy demonstration](assets/d4_fishing_buddy_AHK.gif)
