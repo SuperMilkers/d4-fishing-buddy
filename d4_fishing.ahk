@@ -32,6 +32,7 @@ reelKey := "5"
 setupMode := true
 ready := false
 paused := true
+hasStarted := false
 changingReelKey := false
 fishingActive := false
 biteLatched := false
@@ -58,8 +59,9 @@ zoomDelay := 500
 ; This prevents an interrupted timer cycle from completing an old action.
 stateVersion := 0
 
-ShowStatus("SETUP REQUIRED`nMove the cursor over the Fishing option's position in the Action Wheel.`nLeft-click once to save the position and immediately start fishing.`nAny left-click will complete setup.")
+ShowStatus("SETUP REQUIRED`nMove the cursor over the Fishing option's position in the Action Wheel.`nLeft-click once to save the position.`nFishing will remain PAUSED until you press F8.")
 return
+
 
 WatchFishing:
     if (!ready || paused || setupMode || changingReelKey)
@@ -178,6 +180,7 @@ WatchFishing:
         ShowRunningStatus(defaultStatus, cycleVersion)
 return
 
+
 ; Capture the Fishing option's screen position during setup.
 #If (setupMode)
 
@@ -187,22 +190,22 @@ LButton::
     stateVersion++
     setupMode := false
     ready := true
-    paused := false
+    paused := true
+    hasStarted := false
     fishingActive := false
     biteLatched := false
 
-    ; Allow the first cast to happen immediately.
+    ; Prepare first cast so it can happen immediately after F8 is pressed.
     lastCast := A_TickCount - castCooldown
 
     SoundBeep, 1000, 150
-    ShowStatus("SETUP COMPLETE`nFishing option position: " castX ", " castY "`nFishing automation started.")
-
-    SetTimer, WatchFishing, 100
+    ShowStatus("SETUP COMPLETE`nFishing option position: " castX ", " castY "`nFISHING PAUSED`nPress F8 to start.")
 return
 
 #If
 
-; Pause or resume the automation.
+
+; Start, pause, or resume the automation.
 F8::
     if (!ready)
     {
@@ -211,22 +214,35 @@ F8::
     }
 
     stateVersion++
-    paused := !paused
 
     if (paused)
     {
-        SetTimer, WatchFishing, Off
-        ShowStatus("FISHING PAUSED")
+        paused := false
+
+        if (!hasStarted)
+        {
+            ; First F8 press after setup starts immediately.
+            hasStarted := true
+            lastCast := A_TickCount - castCooldown
+            ShowStatus("FISHING STARTED")
+        }
+        else
+        {
+            ; Normal resume avoids an immediate recast.
+            lastCast := A_TickCount
+            ShowStatus("FISHING RESUMED")
+        }
+
+        SetTimer, WatchFishing, 100
     }
     else
     {
-        ; Prevent an immediate recast when resuming.
-        lastCast := A_TickCount
-
-        SetTimer, WatchFishing, 100
-        ShowStatus("FISHING RESUMED")
+        paused := true
+        SetTimer, WatchFishing, Off
+        ShowStatus("FISHING PAUSED")
     }
 return
+
 
 ; Choose a new Fishing option position.
 F10::
@@ -236,11 +252,13 @@ F10::
     paused := true
     ready := false
     setupMode := true
+    hasStarted := false
     fishingActive := false
     biteLatched := false
 
-    ShowStatus("SETUP REQUIRED`nMove the cursor over the new Fishing option position in the Action Wheel.`nLeft-click once to save the position and immediately resume fishing.`nAny left-click will complete setup.")
+    ShowStatus("SETUP REQUIRED`nMove the cursor over the new Fishing option position in the Action Wheel.`nLeft-click once to save the position.`nFishing will remain PAUSED until you press F8.")
 return
+
 
 ; Change the reel key.
 F11::
@@ -287,11 +305,13 @@ F11::
         SetTimer, WatchFishing, 100
 return
 
+
 Esc::
     SetTimer, WatchFishing, Off
     ToolTip
     ExitApp
 return
+
 
 ; Display running status only if the current timer cycle is still valid.
 ShowRunningStatus(message, cycleVersion)
@@ -306,15 +326,16 @@ ShowRunningStatus(message, cycleVersion)
     Critical, Off
 }
 
+
 ; Display the current status, reel key, and all controls.
 ShowStatus(message)
 {
     global reelKey
 
     controls := "`n`nReel key: " reelKey
-    controls .= "`nF8: Pause/Resume"
-    controls .= "`nF10: Change Fishing option position"
-    controls .= "`nF11: Change reel key"
+    controls .= "`nF8: Start/Pause/Resume"
+    controls .= "`nF10: Change Cast Fishing Cursor Position"
+    controls .= "`nF11: Change Reel Key"
     controls .= "`nEsc: Quit"
 
     ToolTip, % message controls, 20, 20
