@@ -42,7 +42,7 @@ The Fishing option position is stored only while the script is running:
 1. Stand near fishable water and face it.
 2. Start `d4_fishing.ahk`.
 3. Press `E` to open the Diablo IV Action Wheel.
-4. Move the pointer over **Fishing** and left-click it.
+4. Move the pointer over **Fishing** and left-click it. (The fishing cast in chat wheel)
 5. The script records the position and begins monitoring automatically.
 
 You do not need to press `F10` during startup. Use `F10` only to change the Fishing option position afterward.
