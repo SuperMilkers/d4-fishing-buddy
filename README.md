@@ -53,8 +53,8 @@ After the first cast, the script scrolls up five times to zoom in for more relia
 
 | Hotkey | Action |
 | --- | --- |
-| `F8` | Pause or resume automation |
-| `F10` | Choose a new Fishing option position |
+| `F8` | Pause or resume fishing |
+| `F10` | Choose a new fishing option position |
 | `F11` | Change the reel key |
 | `Esc` | Quit |
 

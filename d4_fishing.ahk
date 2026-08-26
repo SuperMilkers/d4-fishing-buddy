@@ -30,6 +30,7 @@ oGraphicSearch := new graphicsearch()
 reelKey := "5"
 
 setupMode := true
+setupClickCount := 0
 ready := false
 paused := true
 hasStarted := false
@@ -59,7 +60,7 @@ zoomDelay := 500
 ; This prevents an interrupted timer cycle from completing an old action.
 stateVersion := 0
 
-ShowStatus("SETUP REQUIRED`nMove the cursor over the Fishing option's position in the Action Wheel.`nLeft-click once to save the position.`nFishing will remain PAUSED until you press F8.")
+ShowStatus("SETUP REQUIRED`nFirst left-click brings Diablo into focus.`nThen move the cursor over the Fishing option and left-click again to save the position.`nFishing will remain PAUSED until you press F8.")
 return
 
 
@@ -182,13 +183,24 @@ return
 
 
 ; Capture the Fishing option's screen position during setup.
+; The first click is ignored so Diablo can be brought to the foreground.
+; The second click records the actual Fishing option position.
 #If (setupMode)
 
 LButton::
+    setupClickCount++
+
+    if (setupClickCount = 1)
+    {
+        ShowStatus("DIABLO FOCUSED`nNow move the cursor over the Fishing option in the Action Wheel and left-click again to save the position.")
+        return
+    }
+
     MouseGetPos, castX, castY
 
     stateVersion++
     setupMode := false
+    setupClickCount := 0
     ready := true
     paused := true
     hasStarted := false
@@ -252,11 +264,12 @@ F10::
     paused := true
     ready := false
     setupMode := true
+    setupClickCount := 0
     hasStarted := false
     fishingActive := false
     biteLatched := false
 
-    ShowStatus("SETUP REQUIRED`nMove the cursor over the new Fishing option position in the Action Wheel.`nLeft-click once to save the position.`nFishing will remain PAUSED until you press F8.")
+    ShowStatus("SETUP REQUIRED`nFirst left-click brings Diablo into focus.`nThen move the cursor over the new Fishing option position and left-click again to save it.`nFishing will remain PAUSED until you press F8.")
 return
 
 
