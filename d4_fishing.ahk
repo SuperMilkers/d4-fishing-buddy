@@ -1,9 +1,8 @@
 ; ==============================================================================
-; Diablo IV Fishing Buddy v1.2
+; Diablo IV Fishing Buddy v1.2.0
 ;
 ; Copyright (c) 2026 SuperMilkers
 ; SPDX-License-Identifier: MIT
-;3
 ; Licensed under the MIT License.
 ;
 ; This is an unofficial community project and is not affiliated with or
@@ -30,46 +29,34 @@ settingsFile := A_ScriptDir "\d4_fishing.ini"
 
 
 ; ==============================================================================
-; KEYBINDS
+; 1440P DEFAULTS
 ; ==============================================================================
 
 defaultActionWheelKey := "e"
 defaultReelKey := "5"
 
+defaultBiteBoxX := 1196
+defaultBiteBoxY := 82
+defaultBiteBoxW := 40
+defaultBiteBoxH := 40
+
+defaultFishingBoxX := 1020
+defaultFishingBoxY := 1296
+defaultFishingBoxW := 520
+defaultFishingBoxH := 85
+
+defaultCastEllipseX := 971
+defaultCastEllipseY := 555
+defaultCastEllipseW := 230
+defaultCastEllipseH := 115
+
+
+; ==============================================================================
+; LOAD KEYBINDS
+; ==============================================================================
+
 IniRead, actionWheelKey, %settingsFile%, Keys, ActionWheel, %defaultActionWheelKey%
 IniRead, reelKey, %settingsFile%, Keys, Reel, %defaultReelKey%
-
-
-; ==============================================================================
-; DEFAULT BITE BOX
-; ==============================================================================
-
-defaultBiteBoxX := 1169
-defaultBiteBoxY := 114
-defaultBiteBoxW := 181
-defaultBiteBoxH := 195
-
-
-; ==============================================================================
-; DEFAULT FISHING STATE BOX
-; ==============================================================================
-
-defaultFishingBoxX := 0
-defaultFishingBoxY := 0
-defaultFishingBoxW := A_ScreenWidth
-defaultFishingBoxH := A_ScreenHeight
-
-
-; ==============================================================================
-; DEFAULT CAST ELLIPSE
-; ==============================================================================
-
-; Original cast location was approximately 1110,582.
-
-defaultCastEllipseX := 1020
-defaultCastEllipseY := 537
-defaultCastEllipseW := 180
-defaultCastEllipseH := 90
 
 
 ; ==============================================================================
@@ -124,6 +111,8 @@ cyanColor2 := 0x6DFDD6
 cyanColor3 := 0x41DEC6
 cyanColor4 := 0x3DC8B6
 
+cyanColors := [cyanColor1, cyanColor2, cyanColor3, cyanColor4]
+
 cyanVariation := 40
 
 cyanHitsRequired := 2
@@ -143,24 +132,24 @@ oGraphicSearch := new graphicsearch()
 ; AUTOMATION CONFIGURATION
 ; ==============================================================================
 
-scanInterval := 25
+scanInterval := 100
+fishingStateScanInterval := 800
 
-ready := true
 paused := true
 hasStarted := false
-
 changingKeys := false
 
-fishingActive := false
 biteLatched := false
+lastFishingDetected := false
 
+lastFishingStateScan := 0
 lastFishingSeen := 0
 lastBiteSeen := 0
 lastReel := 0
 lastCast := 0
 
-reelCooldown := 1500
-castCooldown := 5000
+reelCooldown := 1000
+castCooldown := 2500
 
 noticeUntil := 0
 noticeText := ""
@@ -180,6 +169,7 @@ editMode := false
 selectedOverlay := ""
 
 previousEditPauseState := true
+previousKeybindPauseState := true
 
 overlaysCreated := false
 
@@ -191,9 +181,7 @@ biteLabelHwnd := 0
 fishingLabelHwnd := 0
 castLabelHwnd := 0
 
-
 ; GUI control variables must be global in AHK v1.
-
 BiteTop := ""
 BiteBottom := ""
 BiteLeft := ""
@@ -216,6 +204,9 @@ CastExternalText := ""
 statusCreated := false
 statusHwnd := 0
 statusMessage := ""
+
+lastStatusMessage := ""
+lastStatusHotkeyText := ""
 
 StatusText := ""
 StatusHotkeys := ""
@@ -254,14 +245,11 @@ return
 
 WatchFishing:
 
-    if (!ready || paused || changingKeys || editMode)
+    if (paused || changingKeys || editMode)
         return
 
-
     cycleVersion := stateVersion
-
     now := A_TickCount
-
 
     ; ==========================================================================
     ; BITE SEARCH AREA
@@ -269,54 +257,28 @@ WatchFishing:
 
     biteSearchX1 := biteBoxX
     biteSearchY1 := biteBoxY
-
     biteSearchX2 := biteBoxX + biteBoxW - 1
     biteSearchY2 := biteBoxY + biteBoxH - 1
 
-
     ; ==========================================================================
-    ; CYAN SEARCH
+    ; FAST CYAN SEARCH
     ; ==========================================================================
 
     cyanFound := false
 
-
-    PixelSearch, cyanX, cyanY, %biteSearchX1%, %biteSearchY1%, %biteSearchX2%, %biteSearchY2%, %cyanColor1%, %cyanVariation%, Fast RGB
-
-    if (!ErrorLevel)
-        cyanFound := true
-
-
-    if (!cyanFound)
+    for _, cyanColor in cyanColors
     {
-        PixelSearch, cyanX, cyanY, %biteSearchX1%, %biteSearchY1%, %biteSearchX2%, %biteSearchY2%, %cyanColor2%, %cyanVariation%, Fast RGB
+        PixelSearch, cyanX, cyanY, %biteSearchX1%, %biteSearchY1%, %biteSearchX2%, %biteSearchY2%, %cyanColor%, %cyanVariation%, Fast RGB
 
         if (!ErrorLevel)
+        {
             cyanFound := true
+            break
+        }
     }
-
-
-    if (!cyanFound)
-    {
-        PixelSearch, cyanX, cyanY, %biteSearchX1%, %biteSearchY1%, %biteSearchX2%, %biteSearchY2%, %cyanColor3%, %cyanVariation%, Fast RGB
-
-        if (!ErrorLevel)
-            cyanFound := true
-    }
-
-
-    if (!cyanFound)
-    {
-        PixelSearch, cyanX, cyanY, %biteSearchX1%, %biteSearchY1%, %biteSearchX2%, %biteSearchY2%, %cyanColor4%, %cyanVariation%, Fast RGB
-
-        if (!ErrorLevel)
-            cyanFound := true
-    }
-
 
     if (paused || cycleVersion != stateVersion)
         return
-
 
     ; ==========================================================================
     ; REEL
@@ -325,9 +287,7 @@ WatchFishing:
     if (cyanFound)
     {
         cyanHitCount++
-
         lastBiteSeen := now
-
 
         if (cyanHitCount >= cyanHitsRequired)
         {
@@ -336,166 +296,143 @@ WatchFishing:
                 if (paused || cycleVersion != stateVersion)
                     return
 
-
                 biteLatched := true
-
                 lastReel := now
-
 
                 SendConfiguredKey(reelKey)
 
                 noticeText := "FISH FOUND - CYAN`nPRESSED " reelKey
-
                 noticeUntil := A_TickCount + 2000
+
+                ShowRunningStatus(noticeText, cycleVersion)
+                return
             }
         }
     }
     else
     {
         cyanHitCount := 0
-
 
         if (biteLatched && now - lastBiteSeen > 500)
             biteLatched := false
     }
 
-
     ; ==========================================================================
-    ; FISHING STATE SEARCH AREA
-    ; ==========================================================================
-
-    fishingSearchX1 := fishingBoxX
-    fishingSearchY1 := fishingBoxY
-
-    fishingSearchX2 := fishingBoxX + fishingBoxW - 1
-    fishingSearchY2 := fishingBoxY + fishingBoxH - 1
-
-
-    fishingOptions := {x1: fishingSearchX1
-        , y1: fishingSearchY1
-        , x2: fishingSearchX2
-        , y2: fishingSearchY2
-        , findall: 0}
-
-
-    fishingResult := oGraphicSearch.search(fishingQuery, fishingOptions)
-
-
-    if (paused || cycleVersion != stateVersion)
-        return
-
-
-    ; ==========================================================================
-    ; FISHING ACTIVE
+    ; SLOWER FISHING-STATE SEARCH
     ; ==========================================================================
 
-    if IsObject(fishingResult)
+    if ((now - lastFishingStateScan) >= fishingStateScanInterval)
     {
-        fishingActive := true
+        lastFishingStateScan := now
 
-        lastFishingSeen := now
+        fishingSearchX1 := fishingBoxX
+        fishingSearchY1 := fishingBoxY
+        fishingSearchX2 := fishingBoxX + fishingBoxW - 1
+        fishingSearchY2 := fishingBoxY + fishingBoxH - 1
 
+        fishingOptions := {x1: fishingSearchX1
+            , y1: fishingSearchY1
+            , x2: fishingSearchX2
+            , y2: fishingSearchY2
+            , findall: 0}
 
-        defaultStatus := "FISHING ACTIVE`nWatching for a bite..."
-    }
+        fishingResult := oGraphicSearch.search(fishingQuery, fishingOptions)
 
+        if (paused || cycleVersion != stateVersion)
+            return
 
-    ; ==========================================================================
-    ; NOT FISHING
-    ; ==========================================================================
-
-    else if (now - lastFishingSeen > 1200)
-    {
-        fishingActive := false
-
-        biteLatched := false
-        cyanHitCount := 0
-
-
-        if (now - lastCast > castCooldown)
+        if IsObject(fishingResult)
         {
-            if (paused || cycleVersion != stateVersion)
-                return
+            lastFishingDetected := true
+            lastFishingSeen := now
+        }
+        else
+        {
+            lastFishingDetected := false
+        }
 
+        ; ======================================================================
+        ; NOT FISHING / AUTO CAST
+        ; ======================================================================
 
-            lastCast := now
+        if (!lastFishingDetected && now - lastFishingSeen > 1200)
+        {
+            biteLatched := false
+            cyanHitCount := 0
 
-
-            ; ==================================================================
-            ; OPEN ACTION WHEEL
-            ; ==================================================================
-
-            SendConfiguredKey(actionWheelKey)
-
-
-            Sleep, 400
-
-
-            if (paused || cycleVersion != stateVersion)
-                return
-
-
-            ; ==================================================================
-            ; RANDOM CLICK IN CAST ELLIPSE
-            ; ==================================================================
-
-            RandomClickCastEllipse()
-
-
-            if (paused || cycleVersion != stateVersion)
-                return
-
-
-            ; ==================================================================
-            ; INITIAL ZOOM
-            ; ==================================================================
-
-            if (zoomStepsSent < zoomSteps)
+            if (now - lastCast > castCooldown)
             {
-                Sleep, %zoomDelay%
+                if (paused || cycleVersion != stateVersion)
+                    return
 
+                lastCast := now
+                lastFishingStateScan := now
+
+                ; ==============================================================
+                ; OPEN ACTION WHEEL
+                ; ==============================================================
+
+                SendConfiguredKey(actionWheelKey)
+
+                Sleep, 400
 
                 if (paused || cycleVersion != stateVersion)
                     return
 
+                ; ==============================================================
+                ; RANDOM CLICK IN CAST ELLIPSE
+                ; ==============================================================
 
-                Loop
+                RandomClickCastEllipse()
+
+                if (paused || cycleVersion != stateVersion)
+                    return
+
+                ; ==============================================================
+                ; INITIAL ZOOM
+                ; ==============================================================
+
+                if (zoomStepsSent < zoomSteps)
                 {
-                    if (zoomStepsSent >= zoomSteps)
-                        break
-
+                    Sleep, %zoomDelay%
 
                     if (paused || cycleVersion != stateVersion)
                         return
 
+                    Loop
+                    {
+                        if (zoomStepsSent >= zoomSteps)
+                            break
 
-                    SendEvent, {WheelUp}
+                        if (paused || cycleVersion != stateVersion)
+                            return
 
-                    zoomStepsSent++
+                        SendEvent, {WheelUp}
+                        zoomStepsSent++
 
-
-                    Sleep, 60
+                        Sleep, 60
+                    }
                 }
+
+                noticeText := "CASTING`nACTION WHEEL + RANDOM CAST CLICK"
+                noticeUntil := A_TickCount + 2000
             }
-
-
-            noticeText := "CASTING`nACTION WHEEL + RANDOM CAST CLICK"
-
-            noticeUntil := A_TickCount + 2000
         }
+    }
 
+    ; ==========================================================================
+    ; STATUS
+    ; ==========================================================================
 
+    if (lastFishingDetected)
+        defaultStatus := "FISHING ACTIVE`nWatching for a bite..."
+    else if (now - lastFishingSeen > 1200)
         defaultStatus := "NOT CURRENTLY FISHING`nAttempting to cast..."
-    }
     else
-    {
         defaultStatus := "Checking fishing state..."
-    }
-
 
     if (paused || cycleVersion != stateVersion)
         return
-
 
     if (A_TickCount < noticeUntil)
         ShowRunningStatus(noticeText, cycleVersion)
@@ -514,32 +451,26 @@ F8::
     if (editMode)
     {
         ShowEditStatus()
-
         return
     }
-
 
     if (changingKeys)
         return
 
-
     stateVersion++
-
 
     if (paused)
     {
         paused := false
-
         biteLatched := false
         cyanHitCount := 0
-
+        lastFishingDetected := false
+        lastFishingStateScan := 0
 
         if (!hasStarted)
         {
             hasStarted := true
-
             lastCast := A_TickCount - castCooldown
-
 
             ShowStatus("FISHING STARTED")
         }
@@ -547,23 +478,18 @@ F8::
         {
             lastCast := A_TickCount
 
-
             ShowStatus("FISHING RESUMED")
         }
-
 
         SetTimer, WatchFishing, %scanInterval%
     }
     else
     {
         paused := true
-
         biteLatched := false
         cyanHitCount := 0
 
-
         SetTimer, WatchFishing, Off
-
 
         ShowStatus("FISHING PAUSED")
     }
@@ -580,9 +506,7 @@ F9::
     if (changingKeys)
         return
 
-
     stateVersion++
-
 
     ; ==========================================================================
     ; OPEN EDITOR
@@ -592,70 +516,50 @@ F9::
     {
         previousEditPauseState := paused
 
-
         paused := true
-
         biteLatched := false
         cyanHitCount := 0
 
-
         SetTimer, WatchFishing, Off
 
-
         editMode := true
-
         selectedOverlay := ""
 
-
         CreateEditorOverlays()
-
         ShowEditorOverlays()
 
-        SetTimer, SyncEditorWindows, 30
-
+        SetTimer, SyncEditorWindows, 60
 
         UpdateOverlaySelection()
-
         ShowEditStatus()
-
 
         return
     }
-
 
     ; ==========================================================================
     ; SAVE EDITOR
     ; ==========================================================================
 
     SyncOverlayPositions()
-
     SaveAllRegions()
-
 
     SetTimer, SyncEditorWindows, Off
 
-
     HideEditorOverlays()
 
-
     editMode := false
-
     selectedOverlay := ""
-
 
     paused := previousEditPauseState
 
-
     SoundBeep, 1100, 120
-
 
     if (!paused)
     {
         lastCast := A_TickCount
-
+        lastFishingStateScan := 0
 
         SetTimer, WatchFishing, %scanInterval%
-
 
         ShowStatus("POSITIONS SAVED`nFISHING RESUMED")
     }
@@ -676,31 +580,22 @@ F10::
     if (editMode)
     {
         ShowEditStatus()
-
         return
     }
-
 
     if (changingKeys)
         return
 
-
     stateVersion++
 
-
     changingKeys := true
-
     previousKeybindPauseState := paused
 
-
     paused := true
-
     biteLatched := false
     cyanHitCount := 0
 
-
     SetTimer, WatchFishing, Off
-
 
     ; ==========================================================================
     ; ACTION WHEEL KEY
@@ -708,23 +603,17 @@ F10::
 
     ShowStatus("KEYBIND SETUP`nPress your ACTION WHEEL key.`nCurrent: " actionWheelKey)
 
-
     capturedKey := CaptureSetupKey()
-
 
     if (capturedKey != "")
     {
         actionWheelKey := capturedKey
-
         IniWrite, %actionWheelKey%, %settingsFile%, Keys, ActionWheel
-
 
         SoundBeep, 1000, 100
     }
 
-
     Sleep, 250
-
 
     ; ==========================================================================
     ; REEL KEY
@@ -732,32 +621,25 @@ F10::
 
     ShowStatus("KEYBIND SETUP`nPress your REEL key.`nCurrent: " reelKey)
 
-
     capturedKey := CaptureSetupKey()
-
 
     if (capturedKey != "")
     {
         reelKey := capturedKey
-
         IniWrite, %reelKey%, %settingsFile%, Keys, Reel
-
 
         SoundBeep, 1100, 100
     }
 
-
     changingKeys := false
-
     paused := previousKeybindPauseState
-
 
     if (!paused)
     {
         lastCast := A_TickCount
+        lastFishingStateScan := 0
 
         SetTimer, WatchFishing, %scanInterval%
-
 
         ShowStatus("KEYBINDS SAVED`nAction Wheel: " actionWheelKey "`nReel: " reelKey "`nFISHING RESUMED")
     }
@@ -779,10 +661,24 @@ F12::
     SetTimer, FollowDiabloStatus, Off
     SetTimer, SyncEditorWindows, Off
 
-
     ExitApp
 
 return
+
+
+; ==============================================================================
+; F9 EDITOR HOTKEYS
+; ==============================================================================
+
+#If (editMode)
+
+r::
+
+    Reset1440pDefaults()
+
+return
+
+#If
 
 
 ; ==============================================================================
@@ -830,7 +726,6 @@ SyncEditorWindows:
     if (editMode)
     {
         SyncOverlayPositions()
-
         PositionExternalLabels()
     }
 
@@ -858,10 +753,7 @@ SendConfiguredKey(keyName)
     if (keyName = "")
         return
 
-
     keySend := "{" keyName "}"
-
-
     SendEvent, %keySend%
 }
 
@@ -872,35 +764,116 @@ SendConfiguredKey(keyName)
 
 CaptureSetupKey()
 {
-    keyCapture := InputHook("L0")
-
-    keyCapture.KeyOpt("{All}", "E")
-
-    keyCapture.Start()
-
-    keyCapture.Wait()
-
-
-    newKey := keyCapture.EndKey
-
-
-    if (newKey = "")
-        return ""
-
-
-    ; Reserved program hotkeys.
-    if (newKey = "F8"
-        || newKey = "F9"
-        || newKey = "F10"
-        || newKey = "F12")
+    Loop
     {
-        SoundBeep, 500, 200
+        keyCapture := InputHook("L0")
+        keyCapture.KeyOpt("{All}", "E")
+        keyCapture.Start()
+        keyCapture.Wait()
 
-        return ""
+        newKey := keyCapture.EndKey
+
+        if (newKey = "")
+            continue
+
+        ; Reserved program hotkeys.
+        if (newKey = "F8"
+            || newKey = "F9"
+            || newKey = "F10"
+            || newKey = "F12")
+        {
+            SoundBeep, 500, 200
+            continue
+        }
+
+        return newKey
     }
+}
 
 
-    return newKey
+; ==============================================================================
+; RESET TO 1440P DEFAULTS
+; ==============================================================================
+
+Reset1440pDefaults()
+{
+    global editMode
+    global selectedOverlay
+
+    global defaultActionWheelKey
+    global defaultReelKey
+
+    global defaultBiteBoxX
+    global defaultBiteBoxY
+    global defaultBiteBoxW
+    global defaultBiteBoxH
+
+    global defaultFishingBoxX
+    global defaultFishingBoxY
+    global defaultFishingBoxW
+    global defaultFishingBoxH
+
+    global defaultCastEllipseX
+    global defaultCastEllipseY
+    global defaultCastEllipseW
+    global defaultCastEllipseH
+
+    global actionWheelKey
+    global reelKey
+
+    global biteBoxX
+    global biteBoxY
+    global biteBoxW
+    global biteBoxH
+
+    global fishingBoxX
+    global fishingBoxY
+    global fishingBoxW
+    global fishingBoxH
+
+    global castEllipseX
+    global castEllipseY
+    global castEllipseW
+    global castEllipseH
+
+    global settingsFile
+
+    if (!editMode)
+        return
+
+    biteBoxX := defaultBiteBoxX
+    biteBoxY := defaultBiteBoxY
+    biteBoxW := defaultBiteBoxW
+    biteBoxH := defaultBiteBoxH
+
+    fishingBoxX := defaultFishingBoxX
+    fishingBoxY := defaultFishingBoxY
+    fishingBoxW := defaultFishingBoxW
+    fishingBoxH := defaultFishingBoxH
+
+    castEllipseX := defaultCastEllipseX
+    castEllipseY := defaultCastEllipseY
+    castEllipseW := defaultCastEllipseW
+    castEllipseH := defaultCastEllipseH
+
+    actionWheelKey := defaultActionWheelKey
+    reelKey := defaultReelKey
+
+    selectedOverlay := ""
+
+    ShowEditorOverlays()
+    UpdateOverlaySelection()
+    PositionExternalLabels()
+
+    SaveAllRegions()
+
+    IniWrite, %actionWheelKey%, %settingsFile%, Keys, ActionWheel
+    IniWrite, %reelKey%, %settingsFile%, Keys, Reel
+
+    SoundBeep, 900, 100
+    SoundBeep, 1200, 100
+
+    ShowEditStatus("1440P DEFAULTS RESTORED")
 }
 
 
@@ -915,70 +888,48 @@ RandomClickCastEllipse()
     global castEllipseW
     global castEllipseH
 
-
     centerX := castEllipseX + (castEllipseW / 2)
-
     centerY := castEllipseY + (castEllipseH / 2)
 
-
     radiusX := (castEllipseW / 2) - 10
-
     radiusY := (castEllipseH / 2) - 10
-
 
     if (radiusX < 5)
         radiusX := 5
 
-
     if (radiusY < 5)
         radiusY := 5
 
-
     minX := Round(-radiusX)
-
     maxX := Round(radiusX)
 
-
     minY := Round(-radiusY)
-
     maxY := Round(radiusY)
-
 
     Loop, 100
     {
         Random, offsetX, %minX%, %maxX%
-
         Random, offsetY, %minY%, %maxY%
-
 
         ellipseTest := ((offsetX * offsetX) / (radiusX * radiusX))
             + ((offsetY * offsetY) / (radiusY * radiusY))
 
-
         if (ellipseTest <= 1)
         {
             clickX := Round(centerX + offsetX)
-
             clickY := Round(centerY + offsetY)
 
-
             MouseMove, %clickX%, %clickY%, 0
-
             Click
-
 
             return
         }
     }
 
-
     clickX := Round(centerX)
-
     clickY := Round(centerY)
 
-
     MouseMove, %clickX%, %clickY%, 0
-
     Click
 }
 
@@ -1013,103 +964,72 @@ CreateEditorOverlays()
     global FishingExternalText
     global CastExternalText
 
-
     if (overlaysCreated)
         return
-
 
     ; ==========================================================================
     ; BITE BOX
     ; ==========================================================================
 
     Gui, Bite:New, +AlwaysOnTop +ToolWindow -Caption +HwndbiteBoxHwnd
-
     Gui, Bite:Color, FFEAF3
 
-
     Gui, Bite:Add, Progress, x0 y0 w100 h5 cFF1493 BackgroundFF1493 vBiteTop, 100
-
     Gui, Bite:Add, Progress, x0 y0 w5 h100 cFF1493 BackgroundFF1493 vBiteLeft, 100
-
     Gui, Bite:Add, Progress, x0 y95 w100 h5 cFF1493 BackgroundFF1493 vBiteBottom, 100
-
     Gui, Bite:Add, Progress, x95 y0 w5 h100 cFF1493 BackgroundFF1493 vBiteRight, 100
-
 
     ; ==========================================================================
     ; BITE LABEL
     ; ==========================================================================
 
     Gui, BiteLabelGui:New, +AlwaysOnTop +ToolWindow -Caption +E0x20 +HwndbiteLabelHwnd
-
     Gui, BiteLabelGui:Color, 161616
-
     Gui, BiteLabelGui:Font, s9 Bold cFF69B4, Segoe UI
-
     Gui, BiteLabelGui:Add, Text, vBiteExternalText, BITE
 
-
     WinSet, Transparent, 235, ahk_id %biteLabelHwnd%
-
 
     ; ==========================================================================
     ; FISHING STATE BOX
     ; ==========================================================================
 
     Gui, Fishing:New, +AlwaysOnTop +ToolWindow -Caption +HwndfishingBoxHwnd
-
     Gui, Fishing:Color, EAF8FF
 
-
     Gui, Fishing:Add, Progress, x0 y0 w100 h5 c00AEEF Background00AEEF vFishingTop, 100
-
     Gui, Fishing:Add, Progress, x0 y0 w5 h100 c00AEEF Background00AEEF vFishingLeft, 100
-
     Gui, Fishing:Add, Progress, x0 y95 w100 h5 c00AEEF Background00AEEF vFishingBottom, 100
-
     Gui, Fishing:Add, Progress, x95 y0 w5 h100 c00AEEF Background00AEEF vFishingRight, 100
-
 
     ; ==========================================================================
     ; FISHING LABEL
     ; ==========================================================================
 
     Gui, FishingLabelGui:New, +AlwaysOnTop +ToolWindow -Caption +E0x20 +HwndfishingLabelHwnd
-
     Gui, FishingLabelGui:Color, 161616
-
     Gui, FishingLabelGui:Font, s9 Bold c39C5FF, Segoe UI
-
     Gui, FishingLabelGui:Add, Text, vFishingExternalText, FISHING STATE
 
-
     WinSet, Transparent, 235, ahk_id %fishingLabelHwnd%
-
 
     ; ==========================================================================
     ; CAST ELLIPSE
     ; ==========================================================================
 
     Gui, Cast:New, +AlwaysOnTop +ToolWindow -Caption +HwndcastEllipseHwnd
-
     Gui, Cast:Color, FFD95A
-
 
     ; ==========================================================================
     ; CAST LABEL
     ; ==========================================================================
 
     Gui, CastLabelGui:New, +AlwaysOnTop +ToolWindow -Caption +E0x20 +HwndcastLabelHwnd
-
     Gui, CastLabelGui:Color, 161616
-
     Gui, CastLabelGui:Font, s9 Bold cFFD95A, Segoe UI
-
     Gui, CastLabelGui:Add, Text, vCastExternalText, CAST BUTTON
 
-
     WinSet, Transparent, 235, ahk_id %castLabelHwnd%
-
 
     overlaysCreated := true
 }
@@ -1140,20 +1060,15 @@ ShowEditorOverlays()
     global fishingBoxHwnd
     global castEllipseHwnd
 
-
     ; ==========================================================================
     ; BITE
     ; ==========================================================================
 
     Gui, Bite:Show, x%biteBoxX% y%biteBoxY% w%biteBoxW% h%biteBoxH% NoActivate
 
-
     UpdateBiteBorder()
 
-
-    ; Very light translucent center.
     WinSet, Transparent, 100, ahk_id %biteBoxHwnd%
-
 
     ; ==========================================================================
     ; FISHING STATE
@@ -1161,12 +1076,9 @@ ShowEditorOverlays()
 
     Gui, Fishing:Show, x%fishingBoxX% y%fishingBoxY% w%fishingBoxW% h%fishingBoxH% NoActivate
 
-
     UpdateFishingBorder()
 
-
     WinSet, Transparent, 95, ahk_id %fishingBoxHwnd%
-
 
     ; ==========================================================================
     ; CAST
@@ -1174,23 +1086,17 @@ ShowEditorOverlays()
 
     Gui, Cast:Show, x%castEllipseX% y%castEllipseY% w%castEllipseW% h%castEllipseH% NoActivate
 
-
     UpdateCastEllipseShape()
 
-
     WinSet, Transparent, 115, ahk_id %castEllipseHwnd%
-
 
     ; ==========================================================================
     ; LABELS
     ; ==========================================================================
 
     Gui, BiteLabelGui:Show, AutoSize NoActivate
-
     Gui, FishingLabelGui:Show, AutoSize NoActivate
-
     Gui, CastLabelGui:Show, AutoSize NoActivate
-
 
     PositionExternalLabels()
 }
@@ -1203,16 +1109,11 @@ ShowEditorOverlays()
 HideEditorOverlays()
 {
     Gui, Bite:Hide
-
     Gui, Fishing:Hide
-
     Gui, Cast:Hide
 
-
     Gui, BiteLabelGui:Hide
-
     Gui, FishingLabelGui:Hide
-
     Gui, CastLabelGui:Hide
 }
 
@@ -1230,16 +1131,12 @@ Overlay_LBUTTONDOWN(wParam, lParam, msg, hwnd)
     global fishingBoxHwnd
     global castEllipseHwnd
 
-
     if (!editMode)
         return
 
-
     rootHwnd := DllCall("GetAncestor", "Ptr", hwnd, "UInt", 2, "Ptr")
 
-
     clickedOverlay := ""
-
 
     if (rootHwnd = biteBoxHwnd)
         clickedOverlay := "BITE"
@@ -1253,17 +1150,13 @@ Overlay_LBUTTONDOWN(wParam, lParam, msg, hwnd)
     else
         return
 
-
     ; First click only selects.
     if (selectedOverlay != clickedOverlay)
     {
         selectedOverlay := clickedOverlay
 
-
         UpdateOverlaySelection()
-
         ShowEditStatus()
-
 
         return
     }
@@ -1308,6 +1201,7 @@ Overlay_NCHITTEST(wParam, lParam, msg, hwnd)
     return 2
 }
 
+
 ; ==============================================================================
 ; KEEP SAVED COORDINATES IN SYNC WITH WINDOWS
 ; ==============================================================================
@@ -1333,48 +1227,53 @@ SyncOverlayPositions()
     global castEllipseW
     global castEllipseH
 
-
     if (biteBoxHwnd)
-        WinGetPos, biteBoxX, biteBoxY, biteBoxW, biteBoxH, ahk_id %biteBoxHwnd%
+    {
+        oldW := biteBoxW
+        oldH := biteBoxH
 
+        WinGetPos, newX, newY, newW, newH, ahk_id %biteBoxHwnd%
+
+        biteBoxX := newX
+        biteBoxY := newY
+        biteBoxW := (newW < 40) ? 40 : newW
+        biteBoxH := (newH < 40) ? 40 : newH
+
+        if (biteBoxW != oldW || biteBoxH != oldH)
+            UpdateBiteBorder()
+    }
 
     if (fishingBoxHwnd)
-        WinGetPos, fishingBoxX, fishingBoxY, fishingBoxW, fishingBoxH, ahk_id %fishingBoxHwnd%
+    {
+        oldW := fishingBoxW
+        oldH := fishingBoxH
 
+        WinGetPos, newX, newY, newW, newH, ahk_id %fishingBoxHwnd%
+
+        fishingBoxX := newX
+        fishingBoxY := newY
+        fishingBoxW := (newW < 40) ? 40 : newW
+        fishingBoxH := (newH < 40) ? 40 : newH
+
+        if (fishingBoxW != oldW || fishingBoxH != oldH)
+            UpdateFishingBorder()
+    }
 
     if (castEllipseHwnd)
-        WinGetPos, castEllipseX, castEllipseY, castEllipseW, castEllipseH, ahk_id %castEllipseHwnd%
+    {
+        oldW := castEllipseW
+        oldH := castEllipseH
 
+        WinGetPos, newX, newY, newW, newH, ahk_id %castEllipseHwnd%
 
-    if (biteBoxW < 40)
-        biteBoxW := 40
+        castEllipseX := newX
+        castEllipseY := newY
+        castEllipseW := (newW < 40) ? 40 : newW
+        castEllipseH := (newH < 40) ? 40 : newH
 
-
-    if (biteBoxH < 40)
-        biteBoxH := 40
-
-
-    if (fishingBoxW < 40)
-        fishingBoxW := 40
-
-
-    if (fishingBoxH < 40)
-        fishingBoxH := 40
-
-
-    if (castEllipseW < 40)
-        castEllipseW := 40
-
-
-    if (castEllipseH < 40)
-        castEllipseH := 40
-
-
-    UpdateBiteBorder()
-
-    UpdateFishingBorder()
-
-    UpdateCastEllipseShape()
+        if (castEllipseW != oldW || castEllipseH != oldH)
+            UpdateCastEllipseShape()
+    }
 }
 
 
@@ -1397,26 +1296,19 @@ PositionExternalLabels()
     global fishingLabelHwnd
     global castLabelHwnd
 
-
     labelGap := 27
-
 
     biteLabelX := biteBoxX
     biteLabelY := biteBoxY - labelGap
 
-
     fishingLabelX := fishingBoxX
     fishingLabelY := fishingBoxY - labelGap
-
 
     castLabelX := castEllipseX
     castLabelY := castEllipseY - labelGap
 
-
     WinMove, ahk_id %biteLabelHwnd%,, %biteLabelX%, %biteLabelY%
-
     WinMove, ahk_id %fishingLabelHwnd%,, %fishingLabelX%, %fishingLabelY%
-
     WinMove, ahk_id %castLabelHwnd%,, %castLabelX%, %castLabelY%
 }
 
@@ -1437,57 +1329,41 @@ UpdateOverlaySelection()
     global FishingExternalText
     global CastExternalText
 
-
     biteAlpha := 100
-
     fishingAlpha := 95
-
     castAlpha := 115
-
 
     if (selectedOverlay = "BITE")
         biteAlpha := 180
 
-
     if (selectedOverlay = "FISHING")
         fishingAlpha := 175
-
 
     if (selectedOverlay = "CAST")
         castAlpha := 185
 
-
     WinSet, Transparent, %biteAlpha%, ahk_id %biteBoxHwnd%
-
     WinSet, Transparent, %fishingAlpha%, ahk_id %fishingBoxHwnd%
-
     WinSet, Transparent, %castAlpha%, ahk_id %castEllipseHwnd%
-
 
     if (selectedOverlay = "BITE")
         GuiControl, BiteLabelGui:, BiteExternalText, BITE - SELECTED
     else
         GuiControl, BiteLabelGui:, BiteExternalText, BITE
 
-
     if (selectedOverlay = "FISHING")
         GuiControl, FishingLabelGui:, FishingExternalText, FISHING STATE - SELECTED
     else
         GuiControl, FishingLabelGui:, FishingExternalText, FISHING STATE
-
 
     if (selectedOverlay = "CAST")
         GuiControl, CastLabelGui:, CastExternalText, CAST BUTTON - SELECTED
     else
         GuiControl, CastLabelGui:, CastExternalText, CAST BUTTON
 
-
     Gui, BiteLabelGui:Show, AutoSize NoActivate
-
     Gui, FishingLabelGui:Show, AutoSize NoActivate
-
     Gui, CastLabelGui:Show, AutoSize NoActivate
-
 
     PositionExternalLabels()
 }
@@ -1507,6 +1383,7 @@ GetResizeStep()
 
     return 25
 }
+
 
 ; ==============================================================================
 ; KEYBOARD RESIZE
@@ -1535,10 +1412,8 @@ ResizeSelectedOverlay(changeW, changeH)
     global castEllipseW
     global castEllipseH
 
-
     if (selectedOverlay = "")
         return
-
 
     ; ==========================================================================
     ; BITE
@@ -1548,32 +1423,24 @@ ResizeSelectedOverlay(changeW, changeH)
     {
         WinGetPos, currentX, currentY, currentW, currentH, ahk_id %biteBoxHwnd%
 
-
         newW := currentW + changeW
-
         newH := currentH + changeH
-
 
         if (newW < 40)
             newW := 40
 
-
         if (newH < 40)
             newH := 40
-
 
         biteBoxX := currentX
         biteBoxY := currentY
         biteBoxW := newW
         biteBoxH := newH
 
-
         Gui, Bite:Show, x%biteBoxX% y%biteBoxY% w%biteBoxW% h%biteBoxH% NoActivate
-
 
         UpdateBiteBorder()
     }
-
 
     ; ==========================================================================
     ; FISHING STATE
@@ -1583,32 +1450,24 @@ ResizeSelectedOverlay(changeW, changeH)
     {
         WinGetPos, currentX, currentY, currentW, currentH, ahk_id %fishingBoxHwnd%
 
-
         newW := currentW + changeW
-
         newH := currentH + changeH
-
 
         if (newW < 40)
             newW := 40
 
-
         if (newH < 40)
             newH := 40
-
 
         fishingBoxX := currentX
         fishingBoxY := currentY
         fishingBoxW := newW
         fishingBoxH := newH
 
-
         Gui, Fishing:Show, x%fishingBoxX% y%fishingBoxY% w%fishingBoxW% h%fishingBoxH% NoActivate
-
 
         UpdateFishingBorder()
     }
-
 
     ; ==========================================================================
     ; CAST ELLIPSE
@@ -1618,35 +1477,26 @@ ResizeSelectedOverlay(changeW, changeH)
     {
         WinGetPos, currentX, currentY, currentW, currentH, ahk_id %castEllipseHwnd%
 
-
         newW := currentW + changeW
-
         newH := currentH + changeH
-
 
         if (newW < 40)
             newW := 40
 
-
         if (newH < 40)
             newH := 40
-
 
         castEllipseX := currentX
         castEllipseY := currentY
         castEllipseW := newW
         castEllipseH := newH
 
-
         Gui, Cast:Show, x%castEllipseX% y%castEllipseY% w%castEllipseW% h%castEllipseH% NoActivate
-
 
         UpdateCastEllipseShape()
     }
 
-
     PositionExternalLabels()
-
     ShowEditStatus()
 }
 
@@ -1660,22 +1510,15 @@ UpdateBiteBorder()
     global biteBoxW
     global biteBoxH
 
-
     if (biteBoxW < 40 || biteBoxH < 40)
         return
 
-
     rightX := biteBoxW - 5
-
     bottomY := biteBoxH - 5
 
-
     GuiControl, Bite:Move, BiteTop, % "x0 y0 w" biteBoxW " h5"
-
     GuiControl, Bite:Move, BiteLeft, % "x0 y0 w5 h" biteBoxH
-
     GuiControl, Bite:Move, BiteBottom, % "x0 y" bottomY " w" biteBoxW " h5"
-
     GuiControl, Bite:Move, BiteRight, % "x" rightX " y0 w5 h" biteBoxH
 }
 
@@ -1689,22 +1532,15 @@ UpdateFishingBorder()
     global fishingBoxW
     global fishingBoxH
 
-
     if (fishingBoxW < 40 || fishingBoxH < 40)
         return
 
-
     rightX := fishingBoxW - 5
-
     bottomY := fishingBoxH - 5
 
-
     GuiControl, Fishing:Move, FishingTop, % "x0 y0 w" fishingBoxW " h5"
-
     GuiControl, Fishing:Move, FishingLeft, % "x0 y0 w5 h" fishingBoxH
-
     GuiControl, Fishing:Move, FishingBottom, % "x0 y" bottomY " w" fishingBoxW " h5"
-
     GuiControl, Fishing:Move, FishingRight, % "x" rightX " y0 w5 h" fishingBoxH
 }
 
@@ -1719,13 +1555,10 @@ UpdateCastEllipseShape()
     global castEllipseW
     global castEllipseH
 
-
     if (!castEllipseHwnd)
         return
 
-
     region := "0-0 W" castEllipseW " H" castEllipseH " E"
-
 
     WinSet, Region, %region%, ahk_id %castEllipseHwnd%
 }
@@ -1754,18 +1587,15 @@ SaveAllRegions()
     global castEllipseW
     global castEllipseH
 
-
     IniWrite, %biteBoxX%, %settingsFile%, BiteBox, X
     IniWrite, %biteBoxY%, %settingsFile%, BiteBox, Y
     IniWrite, %biteBoxW%, %settingsFile%, BiteBox, Width
     IniWrite, %biteBoxH%, %settingsFile%, BiteBox, Height
 
-
     IniWrite, %fishingBoxX%, %settingsFile%, FishingBox, X
     IniWrite, %fishingBoxY%, %settingsFile%, FishingBox, Y
     IniWrite, %fishingBoxW%, %settingsFile%, FishingBox, Width
     IniWrite, %fishingBoxH%, %settingsFile%, FishingBox, Height
-
 
     IniWrite, %castEllipseX%, %settingsFile%, CastEllipse, X
     IniWrite, %castEllipseY%, %settingsFile%, CastEllipse, Y
@@ -1778,7 +1608,7 @@ SaveAllRegions()
 ; EDITOR STATUS
 ; ==============================================================================
 
-ShowEditStatus()
+ShowEditStatus(extraMessage := "")
 {
     global selectedOverlay
 
@@ -1786,42 +1616,36 @@ ShowEditStatus()
     global fishingBoxHwnd
     global castEllipseHwnd
 
-
     selectedText := "NONE"
-
 
     if (selectedOverlay = "BITE")
     {
         selectedText := "BITE BOX"
-
         WinGetPos, x, y, w, h, ahk_id %biteBoxHwnd%
     }
     else if (selectedOverlay = "FISHING")
     {
         selectedText := "FISHING STATE BOX"
-
         WinGetPos, x, y, w, h, ahk_id %fishingBoxHwnd%
     }
     else if (selectedOverlay = "CAST")
     {
         selectedText := "CAST BUTTON"
-
         WinGetPos, x, y, w, h, ahk_id %castEllipseHwnd%
     }
 
-
     text := "SET POSITIONS"
 
-    text .= "`nSelected: " selectedText
+    if (extraMessage != "")
+        text .= "`n" extraMessage
 
+    text .= "`nSelected: " selectedText
 
     if (selectedOverlay != "")
     {
         text .= "`nPosition: " x "," y
-
         text .= "`nSize: " w "x" h
     }
-
 
     text .= "`n"
     text .= "`nClick a region to SELECT it."
@@ -1836,8 +1660,8 @@ ShowEditStatus()
     text .= "`nShift + Arrow = 75 px"
     text .= "`nCtrl + Arrow = 200 px"
     text .= "`n"
+    text .= "`nR Reset 1440p Defaults"
     text .= "`nF9 = SAVE POSITIONS"
-
 
     ShowStatus(text)
 }
@@ -1852,13 +1676,10 @@ ShowRunningStatus(message, cycleVersion)
     global paused
     global stateVersion
 
-
     Critical, On
-
 
     if (!paused && cycleVersion = stateVersion)
         ShowStatus(message)
-
 
     Critical, Off
 }
@@ -1874,15 +1695,14 @@ ShowStatus(message)
     global statusHwnd
     global statusMessage
 
+    global lastStatusMessage
+    global lastStatusHotkeyText
+
     global actionWheelKey
     global reelKey
 
     global StatusText
     global StatusHotkeys
-
-
-    statusMessage := message
-
 
     if (!statusCreated)
     {
@@ -1897,7 +1717,6 @@ ShowStatus(message)
         statusCreated := true
     }
 
-
     hotkeyText := "Action Wheel: " actionWheelKey
     hotkeyText .= "`nReel: " reelKey
     hotkeyText .= "`n"
@@ -1906,6 +1725,13 @@ ShowStatus(message)
     hotkeyText .= "`nF10 Set Keybinds"
     hotkeyText .= "`nF12 Quit"
 
+    ; Skip expensive GUI work when nothing visible changed.
+    if (message = lastStatusMessage && hotkeyText = lastStatusHotkeyText)
+        return
+
+    lastStatusMessage := message
+    lastStatusHotkeyText := hotkeyText
+    statusMessage := message
 
     ; Calculate heights from actual line counts.
     StringReplace, statusTemp, statusMessage, `n, `n, UseErrorLevel
@@ -1926,11 +1752,9 @@ ShowStatus(message)
     if (hotkeyH < 24)
         hotkeyH := 24
 
-
     hotkeysY := 10 + statusH + 8
     windowW := 374
     windowH := hotkeysY + hotkeyH + 10
-
 
     GuiControl, Status:, StatusText, %statusMessage%
     GuiControl, Status:, StatusHotkeys, %hotkeyText%
@@ -1938,13 +1762,10 @@ ShowStatus(message)
     GuiControl, Status:Move, StatusText, % "x12 y10 w350 h" statusH
     GuiControl, Status:Move, StatusHotkeys, % "x12 y" hotkeysY " w350 h" hotkeyH
 
-
     Gui, Status:Show, % "w" windowW " h" windowH " NoActivate", Diablo IV Fishing Buddy
-
 
     WinSet, Transparent, 225, ahk_id %statusHwnd%
     WinSet, AlwaysOnTop, On, ahk_id %statusHwnd%
-
 
     PositionStatusWindow()
 }
@@ -1958,34 +1779,25 @@ PositionStatusWindow()
 {
     global statusHwnd
 
-
     if (!statusHwnd)
         return
 
-
     gameHwnd := GetDiabloWindow()
-
 
     if (gameHwnd)
     {
         WinGetPos, gameX, gameY, gameW, gameH, ahk_id %gameHwnd%
 
-
         statusX := gameX + 20
-
         statusY := gameY + 20
     }
     else
     {
         statusX := 20
-
         statusY := 20
     }
 
-
     WinMove, ahk_id %statusHwnd%,, %statusX%, %statusY%
-
-
     WinSet, AlwaysOnTop, On, ahk_id %statusHwnd%
 }
 
@@ -1998,10 +1810,8 @@ GetDiabloWindow()
 {
     hwnd := WinExist("ahk_exe Diablo IV.exe")
 
-
     if (hwnd)
         return hwnd
-
 
     return WinExist("Diablo IV")
 }
