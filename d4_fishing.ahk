@@ -344,10 +344,6 @@ WatchFishing:
 
                 SendConfiguredKey(reelKey)
 
-
-                SoundBeep, 1500, 200
-
-
                 noticeText := "FISH FOUND - CYAN`nPRESSED " reelKey
 
                 noticeUntil := A_TickCount + 2000
