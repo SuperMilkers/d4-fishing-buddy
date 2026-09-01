@@ -1,0 +1,17 @@
+[BiteBox]
+X=1169
+Y=114
+Width=181
+Height=195
+
+[FishingBox]
+X=0
+Y=0
+Width=2560
+Height=1440
+
+[CastEllipse]
+X=1020
+Y=537
+Width=180
+Height=90
