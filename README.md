@@ -1,6 +1,15 @@
 # Diablo IV Fishing Buddy
 
-An AutoHotkey v1 script that uses GraphicSearch to automate Diablo IV fishing. It selects Fishing from a saved Action Wheel position, detects the fishing and bite indicators, and presses a configurable reel key.
+An AutoHotkey v1 script that automates Diablo IV fishing using GraphicSearch and color detection.
+
+It can:
+
+- Open the Action Wheel.
+- Click Cast Fishing Line.
+- Detect when fishing is active.
+- Detect the cyan bite indicator.
+- Press your configured reel key.
+- Save detection areas and keybinds between launches.
 
 Copyright (c) 2026 SuperMilkers. Released under the MIT License.
 
@@ -10,33 +19,45 @@ Copyright (c) 2026 SuperMilkers. Released under the MIT License.
 
 ## Community
 
-Join the Discord for help, updates, and discussion: [discord.gg/gvgbacUHcN](https://discord.gg/gvgbacUHcN)
+Join the Discord for help, updates, and discussion:
+
+https://discord.gg/gvgbacUHcN
 
 ## Requirements
 
 - Windows 10 or Windows 11
 - [AutoHotkey v1.1.37.02](https://www.autohotkey.com/download/1.1/AutoHotkey_1.1.37.02_setup.exe)
+<<<<<<< Updated upstream
 - Diablo IV running in borderless-windowed mode
 - [GraphicSearch](https://github.com/Chunjee/graphicsearch.ahk) files included in the `engine` folder
+=======
+- [GraphicSearch](https://github.com/Chunjee/graphicsearch.ahk), included in the `engine` folder
+>>>>>>> Stashed changes
 
-AutoHotkey v2 is not compatible with this script. Versions 1 and 2 can be installed together because the script uses `#Requires AutoHotkey v1.1`.
+AutoHotkey v2 is not compatible.
+
+The script uses:
+
+`#Requires AutoHotkey v1.1`
+
+so AutoHotkey v1 and v2 can both be installed.
 
 ## Installation
 
 1. Install AutoHotkey v1.1.37.02.
 2. Download and extract this repository.
-3. Confirm that `engine\export.ahk` exists.
-4. Start Diablo IV and move to a fishing location.
-5. Double-click `d4_fishing.ahk`.
+3. Confirm `engine\export.ahk` exists.
+4. Start Diablo IV.
+5. Move near fishable water and face the water.
+6. Double-click `d4_fishing.ahk`.
 
-If Windows uses the wrong AutoHotkey version, run the script explicitly with v1:
+If Windows opens it with the wrong AutoHotkey version:
 
-```bat
-"C:\Program Files\AutoHotkey\v1.1.37.02\AutoHotkeyU64.exe" "C:\path\to\d4_fishing.ahk"
-```
+`"C:\Program Files\AutoHotkey\v1.1.37.02\AutoHotkeyU64.exe" "C:\path\to\d4_fishing.ahk"`
 
-## Setup on Every Launch
+## First-Time Setup
 
+<<<<<<< Updated upstream
 The Fishing option position is stored only while the script is running:
 
 1. Stand near fishable water and face it.
@@ -44,36 +65,113 @@ The Fishing option position is stored only while the script is running:
 3. Press `E` to open the Diablo IV Action Wheel.
 4. Move the pointer over **Fishing** and left-click it. (The fishing cast in chat wheel)
 5. The script records the position and begins monitoring automatically.
+=======
+The script saves its settings in:
 
-You do not need to press `F10` during startup. Use `F10` only to change the Fishing option position afterward.
+`d4_fishing.ini`
+>>>>>>> Stashed changes
 
-After the first cast, the script scrolls up five times to zoom in for more reliable bite detection.
+You normally only need to configure positions and keybinds once.
+
+### 1. Set Positions
+
+Press `F9`.
+
+Three setup areas appear.
+
+**BITE**  
+Place the pink box around the area where the cyan bite indicator appears.
+
+**FISHING STATE**  
+Place the blue box around the fishing-state indicator.
+
+**CAST BUTTON**  
+Place the yellow ellipse over **Cast Fishing Line** on the Action Wheel.
+
+To position an area:
+
+1. Click inside a position box to select it.
+2. Drag the selected area with the mouse to move it.
+3. Use the arrow keys to resize it.
+
+Resize controls:
+
+- `Up` = Taller
+- `Down` = Shorter
+- `Right` = Wider
+- `Left` = Narrower
+
+Resize speed:
+
+- `Arrow` = 25 pixels
+- `Shift + Arrow` = 75 pixels
+- `Ctrl + Arrow` = 200 pixels
+
+Press `F9` again to save all positions.
+
+The script remembers them for future launches.
+
+### 2. Set Keybinds
+
+Press `F10`.
+
+The script asks for two Diablo IV keybinds:
+
+1. Press your **Action Wheel** key.
+2. Press your **Reel** key.
+
+Defaults:
+
+- Action Wheel: `E`
+- Reel: `5`
+
+Both keys are saved automatically in `d4_fishing.ini`.
+
+Do not assign `F8`, `F9`, `F10`, or `F12`. These are reserved by Fishing Buddy.
 
 ## Hotkeys
 
 | Hotkey | Action |
 | --- | --- |
-| `F8` | Pause or resume fishing |
-| `F10` | Choose a new fishing option position |
-| `F11` | Change the reel key |
-| `Esc` | Quit |
+| `F8` | Pause / Start Fishing |
+| `F9` | Set Positions |
+| `F10` | Set Keybinds |
+| `F12` | Quit |
 
-The default reel key is `5`. The selector accepts one keyboard key at a time. Do not assign `F8`, `F10`, `F11`, or `Esc` because the script reserves them.
+The status panel in the upper-left corner of the Diablo IV window also displays these shortcuts.
+
+## Starting Fishing
+
+1. Stand near fishable water.
+2. Face the water.
+3. Press `F8`.
+
+The script will:
+
+1. Check whether fishing is active.
+2. Open the Action Wheel when it needs to cast.
+3. Randomly click inside the saved Cast Fishing Line ellipse.
+4. Detect the fishing state.
+5. Watch the saved BITE area for cyan.
+6. Press the saved reel key when a bite is detected.
+7. Cast again when needed.
+
+After the first cast, the script zooms in automatically to improve detection.
 
 ## Gameplay Notes
 
-- Fish on a low difficulty, such as Normal.
+- Fish on a low difficulty such as Normal.
 - Face fishable water before starting.
 - Fish must be picked up manually.
-- Equip some Thorns in case nearby enemies attack or you fish up an enemy.
-- If **Diablo reconnecting** appears in the upper-left corner, wait for it to clear.
-- Keep the resolution, UI scale, and hotbar layout consistent.
+- Equip some Thorns in case nearby enemies attack or fishing spawns an enemy.
+- If **Diablo reconnecting** appears, wait for it to clear.
+- If you change resolution, UI scale, monitor, or window layout, press `F9` and reposition the areas.
 
 ## Rare Fish Locations
 
-These six yellow Rare fish are required for **The One That Got Away**. Each fish is tied to a region, so other fishable water in the same region may also work.
+These six yellow Rare fish are required for **The One That Got Away**.
 
-| Rare fish | Region | Suggested location |
+| Rare Fish | Region | Suggested Location |
 | --- | --- | --- |
 | Augur of Civo | Dry Steppes | Beach west of Ked Bardu |
 | Morayaga | Fractured Peaks | Bridge east of Yelesna |
@@ -82,56 +180,103 @@ These six yellow Rare fish are required for **The One That Got Away**. Each fish
 | Neme-Senga | Nahantu | Pier west of Kurast Docks |
 | Drakonbeard | Scosglen | Pier west of Marowen |
 
-Catch the yellow **Rare** version and use it from your inventory to register it. Legendary and Unique versions do not count. After registering all six, return to Shi Yugong.
+Catch the yellow **Rare** version and use it from your inventory to register it.
+
+Legendary and Unique versions do not count.
 
 ### Fractured Peaks
 
-Travel southeast from Kyovashad to **Yelesna**, then fish from the bridge on the east side of town. **Marowen is in Scosglen**, not Fractured Peaks.
+Travel southeast from Kyovashad to **Yelesna** and fish from the bridge on the east side of town.
+
+**Marowen is in Scosglen**, not Fractured Peaks.
 
 ## Trawghll Murloc Pet
 
 **Trawghll** is a Murloc pet reportedly obtained from the Mythic **Gurgling Bag of Rubbish** while fishing.
 
-- It can reportedly drop while fishing in any region.
+- It can reportedly drop in any region.
 - There is no confirmed best location.
 - Completing the fish collection is not required.
 - The drop is extremely rare.
 
 ## How It Works
 
-- Checks for the fishing-state icon every 100 milliseconds.
-- Watches for the bite icon while fishing is active.
-- Presses the configured reel key once when a bite is detected.
-- Presses `E` and clicks the saved Fishing position when it needs to cast again.
-- Uses cooldowns and detection latches to prevent repeated actions.
-- Displays the current state, reel key, and hotkeys in a tooltip.
+The script uses three saved screen regions:
+
+**BITE**  
+Searches only the configured area for cyan pixels associated with the bite indicator.
+
+**FISHING STATE**  
+Uses GraphicSearch inside the configured area to determine whether fishing is active.
+
+**CAST BUTTON**  
+Defines an ellipse over Cast Fishing Line. The script chooses a random safe point inside the ellipse when casting.
+
+The script also uses cooldowns and detection latches to prevent repeated actions.
 
 ## Troubleshooting
 
-### Icons are not detected
+### Fishing does not start
 
+<<<<<<< Updated upstream
 - Use borderless-windowed mode.
 - The included searches were captured at `2560 × 1440`. Other resolutions or UI scales may require new captures.
 - Match the hotbar layout shown in the demonstration.
 - Disable HDR, overlays, and color filters.
 - Run the script as administrator if Diablo IV is also running as administrator.
 - Recapture the icons with `engine\graphicsearch_gui.ahk` if needed.
+=======
+- Confirm you are facing fishable water.
+- Press `F9` and verify all three areas are positioned correctly.
+- Make sure the Cast Button ellipse covers **Cast Fishing Line**.
+>>>>>>> Stashed changes
 
-### The casting click lands in the wrong place
+### Bite is not detected
 
+<<<<<<< Updated upstream
 Press `F10`, press `E` to open the Action Wheel, then click Fishing to save its new position. Repeat this after changing the resolution, UI scale, window, or monitor.
+=======
+Press `F9` and make sure the pink **BITE** box covers the cyan bite indicator area.
+>>>>>>> Stashed changes
 
-### Keyboard actions do not reach the game
+Keep the box as small as practical for faster and more reliable detection.
 
-Run Diablo IV and the script at the same privilege level. If the game runs as administrator, run the script as administrator.
+### Script keeps trying to cast
 
-### Pause or quit
+The **FISHING STATE** box may be positioned incorrectly.
 
-Press `F8` and wait for **FISHING PAUSED** to appear. A short action already in progress may finish first. Press `Esc` to quit immediately.
+Press `F9` and move the blue box over the fishing-state indicator.
+
+### Cast click misses the button
+
+Press `F9` and reposition or resize the **CAST BUTTON** ellipse so it stays completely inside the Cast Fishing Line button.
+
+### Wrong keys are being pressed
+
+Press `F10` and set:
+
+1. Action Wheel key
+2. Reel key
+
+The new values are saved automatically.
+
+### After changing monitor or resolution
+
+Press `F9` and reposition the three areas.
+
+The status panel automatically follows the Diablo IV window when the game is moved between monitors.
+
+### Keyboard input does not reach Diablo IV
+
+Run Diablo IV and the script at the same privilege level.
+
+If Diablo IV is running as administrator, run the script as administrator too.
 
 ## Disclaimer
 
-This is an unofficial community project and is not affiliated with or endorsed by Blizzard Entertainment. Automation may be restricted by a game's terms or rules. You are responsible for deciding whether and where to use this script.
+This is an unofficial community project and is not affiliated with or endorsed by Blizzard Entertainment.
+
+Automation may be restricted by a game's terms or rules. You are responsible for deciding whether and where to use this script.
 
 ## License
 
