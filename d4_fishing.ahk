@@ -1,13 +1,9 @@
 ; ==============================================================================
-<<<<<<< Updated upstream
-; Diablo IV Fishing Buddy
-=======
 ; Diablo IV Fishing Buddy v1.2
->>>>>>> Stashed changes
 ;
 ; Copyright (c) 2026 SuperMilkers
 ; SPDX-License-Identifier: MIT
-;
+;3
 ; Licensed under the MIT License.
 ;
 ; This is an unofficial community project and is not affiliated with or
