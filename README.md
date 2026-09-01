@@ -27,12 +27,7 @@ https://discord.gg/gvgbacUHcN
 
 - Windows 10 or Windows 11
 - [AutoHotkey v1.1.37.02](https://www.autohotkey.com/download/1.1/AutoHotkey_1.1.37.02_setup.exe)
-<<<<<<< Updated upstream
-- Diablo IV running in borderless-windowed mode
-- [GraphicSearch](https://github.com/Chunjee/graphicsearch.ahk) files included in the `engine` folder
-=======
 - [GraphicSearch](https://github.com/Chunjee/graphicsearch.ahk), included in the `engine` folder
->>>>>>> Stashed changes
 
 AutoHotkey v2 is not compatible.
 
@@ -57,19 +52,9 @@ If Windows opens it with the wrong AutoHotkey version:
 
 ## First-Time Setup
 
-<<<<<<< Updated upstream
-The Fishing option position is stored only while the script is running:
-
-1. Stand near fishable water and face it.
-2. Start `d4_fishing.ahk`.
-3. Press `E` to open the Diablo IV Action Wheel.
-4. Move the pointer over **Fishing** and left-click it. (The fishing cast in chat wheel)
-5. The script records the position and begins monitoring automatically.
-=======
 The script saves its settings in:
 
 `d4_fishing.ini`
->>>>>>> Stashed changes
 
 You normally only need to configure positions and keybinds once.
 
@@ -90,7 +75,7 @@ Place the yellow ellipse over **Cast Fishing Line** on the Action Wheel.
 
 To position an area:
 
-1. Click inside a position box to select it.
+1. Click an area to select it.
 2. Drag the selected area with the mouse to move it.
 3. Use the arrow keys to resize it.
 
@@ -218,26 +203,13 @@ The script also uses cooldowns and detection latches to prevent repeated actions
 
 ### Fishing does not start
 
-<<<<<<< Updated upstream
-- Use borderless-windowed mode.
-- The included searches were captured at `2560 × 1440`. Other resolutions or UI scales may require new captures.
-- Match the hotbar layout shown in the demonstration.
-- Disable HDR, overlays, and color filters.
-- Run the script as administrator if Diablo IV is also running as administrator.
-- Recapture the icons with `engine\graphicsearch_gui.ahk` if needed.
-=======
 - Confirm you are facing fishable water.
 - Press `F9` and verify all three areas are positioned correctly.
 - Make sure the Cast Button ellipse covers **Cast Fishing Line**.
->>>>>>> Stashed changes
 
 ### Bite is not detected
 
-<<<<<<< Updated upstream
-Press `F10`, press `E` to open the Action Wheel, then click Fishing to save its new position. Repeat this after changing the resolution, UI scale, window, or monitor.
-=======
 Press `F9` and make sure the pink **BITE** box covers the cyan bite indicator area.
->>>>>>> Stashed changes
 
 Keep the box as small as practical for faster and more reliable detection.
 
